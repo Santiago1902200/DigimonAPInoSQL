@@ -1,0 +1,23 @@
+*{
+  margin: 0;
+  box-sizing: border-box;
+}
+
+#menu{
+  background-color: silver;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  padding: 10px;
+}
+
+#menu button{
+  background-color: red;
+  border: solid 0 transparent;
+  font-size: 15px;
+}
