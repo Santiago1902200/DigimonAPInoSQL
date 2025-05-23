@@ -2,14 +2,11 @@ import { auth, db } from '../firebaseConfig.js';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ-:\'. '.split('');
-const MAX_ATTEMPTS = 5;
+const niveles = ["Fresh", "In Training", "Rookie", "Champion", "Ultimate", "Mega", "Armor"];
 
 let pokemonName = '';
 let pokemonId = '';
 let pokemonImage = '';
-let guessedLetters = [];
-let wrongGuesses = 0;
 let gameOver = false;
 let gameWon = false;
 let userWin = 0;
@@ -35,88 +32,73 @@ function createElement(tag, props = {}, ...children) {
   return el;
 }
 
-function render() {
+async function fetchRandomPokemon() {
+  app.innerHTML = '<p>Cargando Digimon...</p>';
+  const res = await fetch('https://digimon-api.vercel.app/api/digimon');
+  const digimones = await res.json();
+
+  const randomIndex = Math.floor(Math.random() * digimones.length);
+  const digimon = digimones[randomIndex];
+
+  pokemonName = digimon.name.toUpperCase();
+  pokemonId = randomIndex + 1; // solo para mantener la variable
+  pokemonImage = digimon.img;
+  const nivelCorrecto = digimon.level.trim().toLowerCase();
+
+  render(nivelCorrecto);
+}
+
+function render(nivelCorrecto) {
   app.innerHTML = '';
 
-  const title = createElement('h2', {}, 'Adivina el Pokémon');
+  const title = createElement('h2', {}, '¿Qué rango tiene este Digimon?');
   const stats = createElement('p', {}, `Ganados: ${userWin} | Perdidos: ${userLose}`);
   app.appendChild(title);
   app.appendChild(stats);
-
-  if (!pokemonName) {
-    app.appendChild(createElement('p', {}, 'Cargando Pokémon...'));
-    return;
-  }
-
   app.appendChild(createElement('p', {}, `ID: ${pokemonId}`));
+  app.appendChild(createElement('p', {}, `Nombre: ${pokemonName}`));
+  app.appendChild(createElement('img', {
+    src: pokemonImage,
+    alt: pokemonName,
+    style: 'width: 150px; height: 150px;'
+  }));
 
-  const img = createElement('img', { src: pokemonImage, alt: pokemonName, style: 'width:150px;height:150px;' });
-  app.appendChild(img);
+  const opcionesDiv = createElement('div', { style: 'margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px;' });
 
-  // Mostrar palabra con guiones o letras
-  const wordDiv = createElement('div');
-  for (const letter of pokemonName) {
-    const displayLetter = (guessedLetters.includes(letter) || gameOver || gameWon) ? letter : '_';
-    const span = createElement('span', { style: 'margin-right: 6px;' }, displayLetter);
-    wordDiv.appendChild(span);
-  }
-  app.appendChild(wordDiv);
-
-  // Teclado
-  const keyboardDiv = createElement('div', { style: 'display:flex; flex-wrap:wrap; max-width: 400px; gap:6px; margin:10px 0;' });
-
-  ALPHABET.forEach(letter => {
-    const disabled = guessedLetters.includes(letter) || gameOver || gameWon;
+  niveles.forEach(nivel => {
     const btn = createElement('button', {
-      style: `width: 35px; height:35px; cursor:${disabled ? 'not-allowed' : 'pointer'}; opacity: ${disabled ? 0.5 : 1}`,
-      onclick: () => handleLetterClick(letter)
-    }, letter);
-    keyboardDiv.appendChild(btn);
+      onclick: () => verificarRango(nivelCorrecto, nivel.toLowerCase()),
+      style: 'padding: 10px; min-width: 100px;'
+    }, nivel);
+    opcionesDiv.appendChild(btn);
   });
 
-  app.appendChild(keyboardDiv);
-
-  // Fallos
-  app.appendChild(createElement('p', {}, `Fallos: ${wrongGuesses} / ${MAX_ATTEMPTS}`));
-
-  if (gameOver) {
-    app.appendChild(createElement('p', { style: 'color: red; font-weight: bold;' }, `💀 ¡Perdiste! Era: ${pokemonName}`));
-  }
-  if (gameWon) {
-    app.appendChild(createElement('p', { style: 'color: green; font-weight: bold;' }, `🎉 ¡Ganaste!`));
-  }
-
-  if (gameOver || gameWon) {
-    const restartBtn = createElement('button', {
-      onclick: restartGame,
-      style: 'margin-top: 10px; padding: 8px 16px; font-weight: bold;'
-    }, 'Jugar otra vez');
-    app.appendChild(restartBtn);
-  }
+  app.appendChild(opcionesDiv);
+  app.appendChild(createElement('p', { id: 'resultado-rango', style: 'font-weight: bold; margin-top: 10px;' }));
 }
 
-async function handleLetterClick(letter) {
-  if (guessedLetters.includes(letter) || gameOver || gameWon) return;
-
-  guessedLetters.push(letter);
-
-  if (!pokemonName.includes(letter)) {
-    wrongGuesses++;
-    if (wrongGuesses >= MAX_ATTEMPTS) {
-      gameOver = true;
-      userLose++;
-      await guardarResultado(false);
-    }
+async function verificarRango(rangoCorrecto, elegido) {
+  const resultado = document.getElementById("resultado-rango");
+  if (rangoCorrecto === elegido) {
+    resultado.textContent = "✅ ¡Correcto!";
+    resultado.style.color = "green";
+    userWin++;
+    gameWon = true;
+    await guardarResultado(true);
   } else {
-    // Verificar si ganó
-    const allCorrect = [...pokemonName].every(l => guessedLetters.includes(l));
-    if (allCorrect) {
-      gameWon = true;
-      userWin++;
-      await guardarResultado(true);
-    }
+    resultado.textContent = `❌ Incorrecto. El rango correcto era: ${rangoCorrecto.charAt(0).toUpperCase() + rangoCorrecto.slice(1)}`;
+    resultado.style.color = "red";
+    userLose++;
+    gameOver = true;
+    await guardarResultado(false);
   }
-  render();
+
+  // Mostrar botón para jugar otra vez
+  const btn = createElement('button', {
+    onclick: restartGame,
+    style: 'margin-top: 10px; padding: 8px 16px; font-weight: bold;'
+  }, 'Jugar otra vez');
+  app.appendChild(btn);
 }
 
 async function guardarResultado(acierto) {
@@ -125,7 +107,7 @@ async function guardarResultado(acierto) {
 
   const resultado = {
     uid,
-    pokemon: pokemonName,
+    digimon: pokemonName,
     aciertos: acierto ? 1 : 0,
     errores: acierto ? 0 : 1,
     fecha,
@@ -135,39 +117,21 @@ async function guardarResultado(acierto) {
     await setDoc(doc(db, 'resultados', `${uid}_${fecha}`), resultado);
     const docRef = doc(db, 'usuarios', uid);
     await updateDoc(docRef, {
-      ganados: acierto ? userWin : userWin,
-      perdidos: !acierto ? userLose : userLose,
+      ganados: userWin,
+      perdidos: userLose,
     });
   } catch (e) {
     console.error('Error al guardar resultado:', e);
   }
 }
 
-async function fetchRandomPokemon() {
-  app.innerHTML = '<p>Cargando Pokémon...</p>';
-  const id = Math.floor(Math.random() * 1025) + 1;
-  try {
-    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
-    const data = await res.json();
-    pokemonName = data.name.toUpperCase();
-    pokemonId = data.id;
-    pokemonImage = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
-  } catch (error) {
-    console.error('Error al obtener el Pokémon:', error);
-  }
-}
-
 async function restartGame() {
-  guessedLetters = [];
-  wrongGuesses = 0;
   gameOver = false;
   gameWon = false;
   pokemonName = '';
   pokemonId = '';
   pokemonImage = '';
-
   await fetchRandomPokemon();
-  render();
 }
 
 async function cargarDatosUsuario() {
@@ -187,13 +151,12 @@ async function cargarDatosUsuario() {
   }
 }
 
-export default function mostrarOriginal() {
+export default function mostrarRango() {
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       uid = user.uid;
       await cargarDatosUsuario();
       await fetchRandomPokemon();
-      render();
     } else {
       app.innerHTML = '<p>Por favor inicia sesión para jugar.</p>';
     }

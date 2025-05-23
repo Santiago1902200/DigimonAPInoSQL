@@ -1,34 +1,72 @@
 export default async function mostrarHome() {
-const app = document.getElementById("app");
-app.innerHTML = `<h2>Pokémon</h2><div id="lista" style="display: flex;
-flex-wrap: wrap; gap: 10px; justify-content: space-between; padding:
-10px;"></div>`;
+    const app = document.getElementById("app");
 
-const lista = document.getElementById("lista");
+    // Limpiar contenido y preparar contenedores
+    app.innerHTML = `
+        <h2>Digimon</h2>
+        <input type="text" id="buscador" placeholder="Buscar Digimon..." style="width: 100%; padding: 10px; margin-bottom: 10px;" />
+        <div id="filtroNiveles" style="margin-bottom: 10px;"></div>
+        <div id="lista" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; padding: 10px;"></div>
+    `;
 
-try {
-const res = await
-fetch("https://pokeapi.co/api/v2/pokemon?limit=1025");
-const json = await res.json();
+    const lista = document.getElementById("lista");
+    const buscador = document.getElementById("buscador");
+    const filtroNiveles = document.getElementById("filtroNiveles");
 
-const data = json.results;
+    try {
+        const res = await fetch("https://digimon-api.vercel.app/api/digimon");
+        const digimones = await res.json();
 
-data.forEach((pokemon) => {
-const id = pokemon.url.split("/")[6];
-const item = document.createElement("div");
+        let digimonesFiltrados = [...digimones]; // Manejamos la lista activa aquí
 
-item.innerHTML = `
-<p>${id} - ${pokemon.name}</p>
-<img
-src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/p
-okemon/other/official-artwork/${id}.png" style="width: 100px; height:
-100px;" />
-`;
+        // Mostrar lista inicial
+        renderLista(digimonesFiltrados);
 
-lista.appendChild(item);
-});
-} catch (error) {
-app.innerHTML = `<p>Error al cargar los Pokémon:
-${error.message}</p>`;
-}
+        // Buscador
+        buscador.addEventListener("input", (e) => {
+            const texto = e.target.value.toLowerCase();
+            if (texto.length >= 3) {
+                const filtrados = digimonesFiltrados.filter(d => d.name.toLowerCase().includes(texto));
+                renderLista(filtrados);
+            } else if (texto.length === 0) {
+                renderLista(digimonesFiltrados);
+            }
+        });
+
+        // Filtro por nivel
+        const niveles = ["All", "Fresh", "In Training", "Rookie", "Champion", "Ultimate", "Mega"];
+        niveles.forEach(nivel => {
+            const btn = document.createElement("button");
+            btn.textContent = nivel;
+            btn.onclick = () => {
+                if (nivel === "All") {
+                    digimonesFiltrados = [...digimones];
+                } else {
+                    digimonesFiltrados = digimones.filter(d => d.level === nivel);
+                }
+                buscador.value = ""; // Limpiar buscador al cambiar filtro
+                renderLista(digimonesFiltrados);
+            };
+            filtroNiveles.appendChild(btn);
+        });
+
+        // Función para renderizar la lista
+        function renderLista(listaDigis) {
+            lista.innerHTML = "";
+            listaDigis.forEach((digimon, i) => {
+                const item = document.createElement("div");
+                item.classList.add(`digimon-${i}`);
+                item.style.textAlign = "center";
+                item.innerHTML = `
+                    <p>${digimon.name}</p>
+                    <img src="${digimon.img}" alt="${digimon.name}" width="100" height="100" />
+                    <p>${digimon.level}</p>
+                `;
+                lista.appendChild(item);
+            });
+        }
+
+    } catch (error) {
+        app.innerHTML = `<p>Error al cargar los Digimon: ${error.message}</p>`;
+    }
 }
